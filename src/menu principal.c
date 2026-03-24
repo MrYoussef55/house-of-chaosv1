@@ -2,13 +2,6 @@
 #include <SDL2/SDL_image.h>
 #include <stdio.h>
 
-typedef struct {
-    SDL_Rect rect;
-    SDL_Texture* normal;
-    SDL_Texture* hover;
-    int hovered;
-} Button;
-
 int menu_run(SDL_Renderer* renderer)
 {
     // Example buttons

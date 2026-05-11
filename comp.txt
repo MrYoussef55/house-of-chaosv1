@@ -1,0 +1,4 @@
+gcc main.c work.c validationH.c -o game -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf
+
+./game
+

@@ -1,6 +1,5 @@
 #ifndef ENEMIE_H
 #define ENEMIE_H
-
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include "common.h"
@@ -18,19 +17,20 @@ typedef struct {
     int lastDamageTime;
     int moving;
     int attacking;
-    int attackCooldown;   /* frames to wait between attacks */
-    int attackTimer;      /* counts down each frame         */
+    int attackCooldown;
+    int attackTimer;
     int speed;
     int currentAction;
     int frame;
     int dx, dy;
     int moveTimer;
+    int dead;
 } Ennemi;
 
+#include "playeri.h"
 void initEnnemi        (Ennemi* e, SDL_Renderer* renderer);
 void afficherEnnemi    (Ennemi  e, SDL_Renderer* renderer, SDL_Rect camera);
 void animerEnnemi      (Ennemi* e);
 void mourir            (Ennemi* e);
-void poursuivreJoueur  (Ennemi* e, SDL_Rect playerRect, SDL_Surface* mask, int* playerHealth);
-
+void poursuivreJoueur  (Ennemi* e, Player* player, SDL_Surface* mask);
 #endif

@@ -1,6 +1,6 @@
 #include "room.h"
 #include "playeri.h"
-#include "collision.h"   // <-- add this
+#include "collision.h"
 #include <stdio.h>
 
 Room rooms[MAX_ROOMS];
@@ -35,14 +35,11 @@ static void setupDoors(void)
 }
 
 static void spawnEnemySafe(Ennemi* e, SDL_Renderer* renderer,
-                            SDL_Surface* mask, int x, int y,
-                            SDL_Point* outSpawn)
+                            SDL_Surface* mask, int x, int y)
 {
     initEnnemi(e, renderer);
     e->destRect.x = x;
     e->destRect.y = y;
-
-    /* if spawn is in collision, nudge right until free */
     int tries = 0;
     while (mask && CollisionParfaite(mask, e->destRect) && tries < 200) {
         e->destRect.x += 4;
@@ -52,35 +49,29 @@ static void spawnEnemySafe(Ennemi* e, SDL_Renderer* renderer,
         }
         tries++;
     }
-    /* store the final resolved spawn position */
-    if (outSpawn) { outSpawn->x = e->destRect.x; outSpawn->y = e->destRect.y; }
 }
 
 static void setupEnemies(SDL_Renderer* renderer)
 {
-    /* --- Room 0: open floor areas visible in screenshot --- */
     rooms[0].enemyCount = 3;
-    spawnEnemySafe(&rooms[0].enemies[0], renderer, rooms[0].mask, 500, 400, &rooms[0].enemySpawnPos[0]);
-    spawnEnemySafe(&rooms[0].enemies[1], renderer, rooms[0].mask, 650, 450, &rooms[0].enemySpawnPos[1]);
-    spawnEnemySafe(&rooms[0].enemies[2], renderer, rooms[0].mask, 750, 400, &rooms[0].enemySpawnPos[2]);
+    spawnEnemySafe(&rooms[0].enemies[0], renderer, rooms[0].mask, 500, 400);
+    spawnEnemySafe(&rooms[0].enemies[1], renderer, rooms[0].mask, 650, 450);
+    spawnEnemySafe(&rooms[0].enemies[2], renderer, rooms[0].mask, 750, 400);
 
-    /* --- Room 1: center open floor --- */
     rooms[1].enemyCount = 3;
-    spawnEnemySafe(&rooms[1].enemies[0], renderer, rooms[1].mask, 350, 350, &rooms[1].enemySpawnPos[0]);
-    spawnEnemySafe(&rooms[1].enemies[1], renderer, rooms[1].mask, 550, 400, &rooms[1].enemySpawnPos[1]);
-    spawnEnemySafe(&rooms[1].enemies[2], renderer, rooms[1].mask, 700, 350, &rooms[1].enemySpawnPos[2]);
+    spawnEnemySafe(&rooms[1].enemies[0], renderer, rooms[1].mask, 350, 350);
+    spawnEnemySafe(&rooms[1].enemies[1], renderer, rooms[1].mask, 550, 400);
+    spawnEnemySafe(&rooms[1].enemies[2], renderer, rooms[1].mask, 700, 350);
 
-    /* --- Room 2: center open floor --- */
     rooms[2].enemyCount = 3;
-    spawnEnemySafe(&rooms[2].enemies[0], renderer, rooms[2].mask, 400, 400, &rooms[2].enemySpawnPos[0]);
-    spawnEnemySafe(&rooms[2].enemies[1], renderer, rooms[2].mask, 600, 450, &rooms[2].enemySpawnPos[1]);
-    spawnEnemySafe(&rooms[2].enemies[2], renderer, rooms[2].mask, 750, 400, &rooms[2].enemySpawnPos[2]);
+    spawnEnemySafe(&rooms[2].enemies[0], renderer, rooms[2].mask, 400, 400);
+    spawnEnemySafe(&rooms[2].enemies[1], renderer, rooms[2].mask, 600, 450);
+    spawnEnemySafe(&rooms[2].enemies[2], renderer, rooms[2].mask, 750, 400);
 
-    /* --- Room 3: center open floor --- */
     rooms[3].enemyCount = 3;
-    spawnEnemySafe(&rooms[3].enemies[0], renderer, rooms[3].mask, 400, 300, &rooms[3].enemySpawnPos[0]);
-    spawnEnemySafe(&rooms[3].enemies[1], renderer, rooms[3].mask, 600, 350, &rooms[3].enemySpawnPos[1]);
-    spawnEnemySafe(&rooms[3].enemies[2], renderer, rooms[3].mask, 750, 300, &rooms[3].enemySpawnPos[2]);
+    spawnEnemySafe(&rooms[3].enemies[0], renderer, rooms[3].mask, 400, 300);
+    spawnEnemySafe(&rooms[3].enemies[1], renderer, rooms[3].mask, 600, 350);
+    spawnEnemySafe(&rooms[3].enemies[2], renderer, rooms[3].mask, 750, 300);
 }
 
 void initRooms(SDL_Renderer* renderer)
@@ -102,7 +93,6 @@ void initRooms(SDL_Renderer* renderer)
         rooms[i].background = IMG_LoadTexture(renderer, bgFiles[i]);
         if (!rooms[i].background)
             printf("Room %d background failed: %s\n", i, IMG_GetError());
-
         rooms[i].mask = IMG_Load(maskFiles[i]);
         if (!rooms[i].mask)
             printf("Room %d mask failed: %s\n", i, IMG_GetError());
@@ -120,7 +110,7 @@ void freeRooms(void)
     }
 }
 
-void checkDoorEntry(SDL_Rect playerRect, Player* player)
+void checkDoorEntry(SDL_Rect playerRect, Player* player, Player* player2)
 {
     if (player->dying || player->dead) return;
 
@@ -137,10 +127,12 @@ void checkDoorEntry(SDL_Rect playerRect, Player* player)
             playerRect.y < door.y + door.h &&
             playerRect.y + playerRect.h > door.y)
         {
-            currentRoom        = r->doorTargetRoom[d];
-            player->destRect.x = r->doorSpawnPoint[d].x;
-            player->destRect.y = r->doorSpawnPoint[d].y;
-            doorCooldown       = 60;
+            currentRoom         = r->doorTargetRoom[d];
+            player->destRect.x  = r->doorSpawnPoint[d].x;
+            player->destRect.y  = r->doorSpawnPoint[d].y;
+            player2->destRect.x = r->doorSpawnPoint[d].x + 70;
+            player2->destRect.y = r->doorSpawnPoint[d].y;
+            doorCooldown        = 60;
             return;
         }
     }

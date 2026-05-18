@@ -1,135 +1,142 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_mixer.h>
 #include <stdlib.h>
 #include <time.h>
-
 #include "common.h"
 #include "collision.h"
 #include "minimap.h"
 #include "playeri.h"
 #include "enemiei.h"
+#include "room.h"
+#include "menu.h"
 
 int main(int argc, char* argv[])
 {
     srand((unsigned)time(NULL));
-
-    SDL_Init(SDL_INIT_VIDEO);
-    IMG_Init(IMG_INIT_PNG);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+    IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
     TTF_Init();
+    Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
 
     SDL_Window*   window   = SDL_CreateWindow("House Of Chaos",
                                  SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                  SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-    /* ---------- background & collision mask ---------- */
-    SDL_Texture* bg   = IMG_LoadTexture(renderer, "background.png");
-    SDL_Surface* mask = IMG_Load("backgroundmask2.png");
+    /* ---- menu ---- */
+    MenuResult cfg = runMenu(renderer);
+    if (cfg.mode == MODE_NONE) goto cleanup;
 
-    if (!bg)   printf("background failed: %s\n", IMG_GetError());
-    if (!mask) printf("mask failed: %s\n",       IMG_GetError());
-    else       printf("mask loaded: %dx%d (screen: %dx%d)\n",
-                      mask->w, mask->h, SCREEN_WIDTH, SCREEN_HEIGHT);
+    /* ---- players ---- */
+    Player player1, player2;
+    initPlayer(&player1, renderer, cfg.avatar1);
+    initPlayer(&player2, renderer, cfg.avatar2);
+    player1.inputScheme = cfg.input1;
+    player2.inputScheme = cfg.input2;
+    player2.destRect.x  = 500;
+    player2.destRect.y  = 600;
 
-    /* ---------- player ---------- */
-    Player player;
-    initPlayer(&player, renderer);
+    /* ---- rooms ---- */
+    initRooms(renderer);
 
-    /* ---------- enemies ---------- */
-    /* Spawn on open wooden floor, spread across the room */
-    Ennemi e1, e2, e3, e4, e5;
-
-    initEnnemi(&e1, renderer);
-    e1.destRect.x = 400; e1.destRect.y = 580;
-
-    initEnnemi(&e2, renderer);
-    e2.destRect.x = 880; e2.destRect.y = 580;
-
-    initEnnemi(&e3, renderer);
-    e3.destRect.x = 300; e3.destRect.y = 600;
-
-    initEnnemi(&e4, renderer);
-    e4.destRect.x = 600; e4.destRect.y = 600;
-
-    initEnnemi(&e5, renderer);
-    e5.destRect.x = 950; e5.destRect.y = 600;
-
-    /* ---------- minimap ---------- */
-    Minimap minimap;
+    /* ---- minimap ---- */
+    Minimap  minimap;
     SDL_Rect minimapPos = {SCREEN_WIDTH - 210, 10, 200, 150};
-    /* Use the player's own walk-down frame 0 as the minimap icon */
-    InitMinimap(&minimap, renderer, "map.png",
-                player.walk[0][0], minimapPos);
+    const char* mapPaths[] = {
+        "background.png", "background2.png",
+        "background3.png", "background4.png"
+    };
+    InitMinimap(&minimap, renderer, mapPaths,
+                player1.walk[0][0], player2.walk[0][0], minimapPos);
 
-    /* fixed camera (no scroll) */
-    SDL_Rect camera = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+    /* showPlayer2 dot on minimap only in multiplayer */
+    int showP2 = (cfg.mode == MODE_MULTI) ? 1 : 0;
 
+    SDL_Rect  camera  = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
     SDL_Event event;
-    int running = 1;
+    int       running = 1;
+    int       tick    = 0;
 
     while (running)
     {
-        /* ---- events ---- */
-        while (SDL_PollEvent(&event))
+        while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) running = 0;
+            if (event.type == SDL_KEYDOWN &&
+                event.key.keysym.sym == SDLK_p) {
+                MenuResult newcfg = runMenu(renderer);
+                if (newcfg.mode == MODE_NONE) { running = 0; break; }
+                cfg   = newcfg;
+                showP2 = (cfg.mode == MODE_MULTI) ? 1 : 0;
+                player1.inputScheme = cfg.input1;
+                player2.inputScheme = cfg.input2;
+            }
+        }
+        if (!running) break;
+
+        Room* room = &rooms[currentRoom];
 
         /* ---- update ---- */
+        tick++;
         const Uint8* keys = SDL_GetKeyboardState(NULL);
-        handleInput(&player, keys, mask);
-        updatePlayer(&player);
 
-        poursuivreJoueur(&e1, player.destRect, mask, &player.health);
-        poursuivreJoueur(&e2, player.destRect, mask, &player.health);
-        poursuivreJoueur(&e3, player.destRect, mask, &player.health);
-        poursuivreJoueur(&e4, player.destRect, mask, &player.health);
-        poursuivreJoueur(&e5, player.destRect, mask, &player.health);
-        animerEnnemi(&e1);
-        animerEnnemi(&e2);
-        animerEnnemi(&e3);
-        animerEnnemi(&e4);
-        animerEnnemi(&e5);
+        handleInput(&player1, keys, room->mask);
+        updatePlayer(&player1);
+        playerAttackEnemies(&player1, room->enemies, room->enemyCount, tick);
 
-        MAJMinimap(&minimap, player.destRect);
+        if (cfg.mode == MODE_MULTI) {
+            handleInput(&player2, keys, room->mask);
+            updatePlayer(&player2);
+            playerAttackEnemies(&player2, room->enemies, room->enemyCount, tick);
+        }
+
+        checkDoorEntry(player1.destRect, &player1, &player2);
+
+        for (int i = 0; i < room->enemyCount; i++) {
+            if (room->enemies[i].dead) continue;
+            poursuivreJoueur(&room->enemies[i], &player1, &player2, room->mask);
+            animerEnnemi    (&room->enemies[i]);
+        }
+
+        MAJMinimap(&minimap, player1.destRect, player2.destRect, currentRoom);
 
         /* ---- render ---- */
         SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, room->background, NULL, NULL);
 
-        /* background */
-        SDL_RenderCopy(renderer, bg, NULL, NULL);
+        for (int i = 0; i < room->enemyCount; i++) {
+            if (room->enemies[i].dead) continue;
+            afficherEnnemi(room->enemies[i], renderer, camera);
+        }
 
-        /* entities */
-        renderPlayer(&player, renderer);
-        afficherEnnemi(e1, renderer, camera);
-        afficherEnnemi(e2, renderer, camera);
-        afficherEnnemi(e3, renderer, camera);
-        afficherEnnemi(e4, renderer, camera);
-        afficherEnnemi(e5, renderer, camera);
+        renderPlayer(&player1, renderer);
+        if (cfg.mode == MODE_MULTI)
+            renderPlayer(&player2, renderer);
 
-        /* minimap border */
-        SDL_Rect border = {minimapPos.x - 4, minimapPos.y - 4,
-                           minimapPos.w + 8, minimapPos.h + 8};
+        SDL_Rect border = {minimapPos.x-4, minimapPos.y-4,
+                           minimapPos.w+8, minimapPos.h+8};
         SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
         SDL_RenderFillRect(renderer, &border);
-        AfficherMinimap(renderer, minimap);
+        AfficherMinimap(renderer, minimap, currentRoom, showP2);
 
-        /* HUD */
-        renderUI(&player, renderer);
+        renderUI(&player1, renderer);
 
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
 
-    /* ---- cleanup ---- */
-    destroyPlayer(&player);
+    destroyPlayer(&player1);
+    destroyPlayer(&player2);
     LibererMinimap(&minimap);
-    SDL_FreeSurface(mask);
-    SDL_DestroyTexture(bg);
+    freeRooms();
+
+cleanup:
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    Mix_CloseAudio();
     TTF_Quit();
     IMG_Quit();
     SDL_Quit();
-
     return 0;
 }

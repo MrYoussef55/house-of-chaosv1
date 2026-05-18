@@ -3,7 +3,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include "common.h"
-
 typedef struct {
     SDL_Texture* walk  [DIRECTIONS][MAX_FRAMES];
     SDL_Texture* attack[DIRECTIONS][MAX_FRAMES];
@@ -26,11 +25,10 @@ typedef struct {
     int moveTimer;
     int dead;
 } Ennemi;
-
 #include "playeri.h"
-void initEnnemi        (Ennemi* e, SDL_Renderer* renderer);
-void afficherEnnemi    (Ennemi  e, SDL_Renderer* renderer, SDL_Rect camera);
-void animerEnnemi      (Ennemi* e);
-void mourir            (Ennemi* e);
-void poursuivreJoueur  (Ennemi* e, Player* player, SDL_Surface* mask);
+void initEnnemi       (Ennemi* e, SDL_Renderer* renderer);
+void afficherEnnemi   (Ennemi  e, SDL_Renderer* renderer, SDL_Rect camera);
+void animerEnnemi     (Ennemi* e);
+void mourir           (Ennemi* e);
+void poursuivreJoueur (Ennemi* e, Player* player, Player* player2, SDL_Surface* mask);
 #endif

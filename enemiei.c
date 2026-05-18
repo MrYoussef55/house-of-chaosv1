@@ -35,32 +35,52 @@ void initEnnemi(Ennemi* e, SDL_Renderer* renderer)
             e->attack[i][j] = attackFiles[i][j] ? IMG_LoadTexture(renderer, attackFiles[i][j]) : NULL;
         }
 
-    e->row           = 0;  e->col          = 0;
-    e->frameCounter  = 0;  e->frameDelay   = 3;
-    e->frameTimer    = 0;
-    e->moving        = 0;  e->attacking    = 0;
+    e->row            = 0;  e->col           = 0;
+    e->frameCounter   = 0;  e->frameDelay    = 3;
+    e->frameTimer     = 0;
+    e->moving         = 0;  e->attacking     = 0;
     e->attackCooldown = 60;
-    e->attackTimer   = 0;
-    e->speed         = 2;
-    e->destRect      = (SDL_Rect){150, 200, 64, 64};
-    e->currentAction = -1;
-    e->frame         = 0;
-    e->dx = 0; e->dy = 0;
-    e->moveTimer     = 0;
-    e->health        = 100;
+    e->attackTimer    = 0;
+    e->speed          = 2;
+    e->destRect       = (SDL_Rect){200, 100, 64, 64};
+    e->currentAction  = -1;
+    e->frame          = 0;
+    e->dx = 0; e->dy  = 0;
+    e->moveTimer      = 0;
+    e->health         = 100;
     e->lastDamageTime = 0;
-    e->dead          = 0;
+    e->dead           = 0;
 }
 
 #define ATTACK_RANGE  60
 #define ATTACK_DAMAGE 10
 
-void poursuivreJoueur(Ennemi* e, Player* player, SDL_Surface* mask)
+void poursuivreJoueur(Ennemi* e, Player* player, Player* player2, SDL_Surface* mask)
 {
     if (e->dead) return;
     if (e->currentAction == 4) return;
 
-    if (player->dying || player->dead) {
+    /* pick nearest alive player */
+    Player* target = NULL;
+    float dist1 = 999999.0f, dist2 = 999999.0f;
+
+    if (!player->dying && !player->dead) {
+        int dx = player->destRect.x - e->destRect.x;
+        int dy = player->destRect.y - e->destRect.y;
+        dist1 = SDL_sqrtf((float)(dx*dx + dy*dy));
+    }
+    if (!player2->dying && !player2->dead) {
+        int dx = player2->destRect.x - e->destRect.x;
+        int dy = player2->destRect.y - e->destRect.y;
+        dist2 = SDL_sqrtf((float)(dx*dx + dy*dy));
+    }
+
+    if (dist1 <= dist2 && dist1 < 999999.0f)
+        target = player;
+    else if (dist2 < 999999.0f)
+        target = player2;
+
+    if (!target) {
         e->moving    = 0;
         e->attacking = 0;
         return;
@@ -68,13 +88,12 @@ void poursuivreJoueur(Ennemi* e, Player* player, SDL_Surface* mask)
 
     int ex = e->destRect.x + e->destRect.w / 2;
     int ey = e->destRect.y + e->destRect.h / 2;
-    int px = player->destRect.x + player->destRect.w / 2;
-    int py = player->destRect.y + player->destRect.h / 2;
+    int px = target->destRect.x + target->destRect.w / 2;
+    int py = target->destRect.y + target->destRect.h / 2;
 
     int diffX = px - ex;
     int diffY = py - ey;
-
-    float dist = SDL_sqrtf((float)(diffX * diffX + diffY * diffY));
+    float dist = SDL_sqrtf((float)(diffX*diffX + diffY*diffY));
 
     int absDx = diffX < 0 ? -diffX : diffX;
     int absDy = diffY < 0 ? -diffY : diffY;
@@ -92,9 +111,9 @@ void poursuivreJoueur(Ennemi* e, Player* player, SDL_Surface* mask)
             e->col          = 0;
             e->frameCounter = 0;
             e->attackTimer  = e->attackCooldown;
-            if (player->health > 0) {
-                player->health -= ATTACK_DAMAGE;
-                if (player->health < 0) player->health = 0;
+            if (target->health > 0) {
+                target->health -= ATTACK_DAMAGE;
+                if (target->health < 0) target->health = 0;
             }
         }
     } else {
@@ -129,17 +148,14 @@ void afficherEnnemi(Ennemi e, SDL_Renderer* renderer, SDL_Rect camera)
     if (e.health > 0) {
         int maxW = 50, barH = 6;
         int curW = (e.health * maxW) / 100;
-
         SDL_Rect bar = {
             e.destRect.x + e.destRect.w / 2 - maxW / 2 - camera.x,
             e.destRect.y - 15 - camera.y,
             curW, barH
         };
-
         if      (e.health > 66) SDL_SetRenderDrawColor(renderer,   0, 255,   0, 255);
         else if (e.health > 33) SDL_SetRenderDrawColor(renderer, 255, 255,   0, 255);
         else                    SDL_SetRenderDrawColor(renderer, 255,   0,   0, 255);
-
         SDL_RenderFillRect(renderer, &bar);
     }
 }
@@ -155,7 +171,6 @@ void animerEnnemi(Ennemi* e)
     if (e->frameCounter >= e->frameDelay) {
         e->frameCounter = 0;
         e->col++;
-
         int maxFrames = e->attacking ? ATTACK_FRAMES : walkFrameCount[e->row];
         if (e->col >= maxFrames) {
             e->col = 0;

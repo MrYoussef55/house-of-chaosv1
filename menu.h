@@ -1,12 +1,31 @@
 #ifndef MENU_H
 #define MENU_H
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
+#include <SDL2/SDL_mixer.h>
+#include <stdbool.h>
+#include "playeri.h"
 
-#include "app.h"
+typedef enum {
+    MODE_NONE,
+    MODE_SOLO,
+    MODE_MULTI
+} GameMode;
 
-void MainMenu_Init(App* app);
-void MainMenu_HandleEvent(App* app, SDL_Event* e, SDL_Renderer* renderer);
-void MainMenu_Update(App* app);
-void MainMenu_Render(App* app);
-void MainMenu_Destroy();
-void fade(SDL_Renderer* renderer, int fadeIn);
+typedef struct {
+    SDL_Rect      rect;
+    SDL_Texture*  texOff;
+    SDL_Texture*  texOn;
+} Button;
+
+typedef struct {
+    GameMode    mode;
+    InputScheme input1;
+    InputScheme input2;
+    int         avatar1;   /* 0 = orange, 1 = yellow */
+    int         avatar2;   /* 0 = orange, 1 = yellow */
+} MenuResult;
+
+MenuResult runMenu(SDL_Renderer* renderer);
+
 #endif

@@ -31,18 +31,29 @@ int main(int argc, char* argv[])
 
     /* ---- players ---- */
     Player player1, player2;
-    initPlayer(&player1, renderer, cfg.avatar1);   /* chosen avatar */
-    initPlayer(&player2, renderer, cfg.avatar2);   /* chosen avatar */
+    initPlayer(&player1, renderer, cfg.avatar1);
+    initPlayer(&player2, renderer, cfg.avatar2);
     player1.inputScheme = cfg.input1;
     player2.inputScheme = cfg.input2;
     player2.destRect.x  = 500;
     player2.destRect.y  = 600;
 
+    /* In solo mode, park player2 far off-screen and mark inactive
+     * so enemies never target the invisible second player. */
+    if (cfg.mode == MODE_SOLO) {
+        player2.active       = 0;
+        player2.dead         = 1;
+        player2.lives        = 0;
+        player2.health       = 0;
+        player2.destRect.x   = -9999;
+        player2.destRect.y   = -9999;
+    }
+
     /* ---- rooms ---- */
     initRooms(renderer);
 
     /* ---- minimap ---- */
-    Minimap minimap;
+    Minimap  minimap;
     SDL_Rect minimapPos = {SCREEN_WIDTH - 210, 10, 200, 150};
     const char* mapPaths[] = {
         "background.png", "background2.png",
@@ -51,6 +62,9 @@ int main(int argc, char* argv[])
     InitMinimap(&minimap, renderer, mapPaths,
                 player1.walk[0][0], player2.walk[0][0], minimapPos);
 
+    /* showPlayer2 dot on minimap only in multiplayer */
+    int showP2 = (cfg.mode == MODE_MULTI) ? 1 : 0;
+
     SDL_Rect  camera  = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
     SDL_Event event;
     int       running = 1;
@@ -58,14 +72,14 @@ int main(int argc, char* argv[])
 
     while (running)
     {
-        /* ---- events ---- */
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) running = 0;
             if (event.type == SDL_KEYDOWN &&
                 event.key.keysym.sym == SDLK_p) {
                 MenuResult newcfg = runMenu(renderer);
                 if (newcfg.mode == MODE_NONE) { running = 0; break; }
-                cfg = newcfg;
+                cfg   = newcfg;
+                showP2 = (cfg.mode == MODE_MULTI) ? 1 : 0;
                 player1.inputScheme = cfg.input1;
                 player2.inputScheme = cfg.input2;
             }
@@ -111,11 +125,11 @@ int main(int argc, char* argv[])
         if (cfg.mode == MODE_MULTI)
             renderPlayer(&player2, renderer);
 
-        SDL_Rect border = {minimapPos.x - 4, minimapPos.y - 4,
-                           minimapPos.w + 8, minimapPos.h + 8};
+        SDL_Rect border = {minimapPos.x-4, minimapPos.y-4,
+                           minimapPos.w+8, minimapPos.h+8};
         SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
         SDL_RenderFillRect(renderer, &border);
-        AfficherMinimap(renderer, minimap, currentRoom);
+        AfficherMinimap(renderer, minimap, currentRoom, showP2);
 
         renderUI(&player1, renderer);
 

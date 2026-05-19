@@ -29,6 +29,7 @@ typedef struct {
     int lives;
     int health;
     int avatar;          /* 0 = orange, 1 = yellow */
+    int active;          /* 1 = in play, 0 = disabled (solo P2) */
     InputScheme inputScheme;
     SDL_Rect destRect;
 } Player;
